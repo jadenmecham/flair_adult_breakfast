@@ -1,0 +1,29 @@
+[project]
+name = "flair-adult-breakfast"
+version = "0.1.0"
+description = "Tracking dashboard for the apple and coffee consumption of the Flair office space."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "altair>=5",
+    "marimo>=0.16",
+    "pandas>=2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# marimo cells display their last expression, which looks "useless" to ruff.
+per-file-ignores = { "dashboard.py" = ["B018"], "entry.py" = ["B018"] }
