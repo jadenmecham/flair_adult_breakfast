@@ -19,9 +19,12 @@ def _(mo, pd):
     def load_csv(name):
         src = str(mo.notebook_location() / "public" / name)
         if src.startswith(("http://", "https://")):
+            import time
+
             from pyodide.http import open_url  # only exists in the browser
 
-            src = open_url(src)
+            # Unique query string so the browser never serves a cached, outdated CSV.
+            src = open_url(f"{src}?t={time.time_ns()}")
         df = pd.read_csv(src, dtype={"person": str, "item": str, "type": str})
         df["date"] = pd.to_datetime(df["date"])
         return df
@@ -42,12 +45,20 @@ def _(mo):
 
 @app.cell
 def _(df, mo):
-    _tiles = [
-        mo.stat(int(df.loc[df["item"] == item, "quantity"].sum()), label=label)
-        for item, label in (("apple", "🍎 Total apples"), ("coffee", "☕ Total coffees"))
-    ]
-    _caption = mo.md(f"_From everyone's tallies, as of {df['date'].max():%b %d, %Y}._")
-    mo.vstack([mo.hstack(_tiles, widths="equal"), _caption]) if len(df) else None
+    def _summary():
+        start, end = df["date"].min(), df["date"].max()
+        days = (end - start).days + 1  # calendar days, counting both ends
+        tiles = []
+        for item, emoji, plural in (("apple", "🍎", "apples"), ("coffee", "☕", "coffees")):
+            total = int(df.loc[df["item"] == item, "quantity"].sum())
+            tiles.append(mo.stat(total, label=f"{emoji} Total {plural}"))
+            tiles.append(mo.stat(f"{total / days:.1f}", label=f"{emoji} {plural.title()} per day"))
+        caption = mo.md(
+            f"_From everyone's tallies, {start:%b %d} – {end:%b %d, %Y} ({days} days)._"
+        )
+        return mo.vstack([mo.hstack(tiles, widths="equal"), caption])
+
+    _summary() if len(df) else None
     return
 
 
@@ -62,7 +73,7 @@ def _(mo):
 
 
 @app.cell
-def _(alt, df, line_item, mo):
+def _(alt, df, line_item, mo, pd):
     def _running_total():
         sub = df if line_item.value == "both" else df[df["item"] == line_item.value]
         # One row per date and person, with 0 on days a person logged nothing, so every
@@ -87,17 +98,18 @@ def _(alt, df, line_item, mo):
             clear=False,
             value=[{"person": p} for p in daily.columns],
         )
-        return (
+        x = alt.X(
+            "yearmonthdate(date):T",
+            title=None,
+            axis=alt.Axis(format="%b %d", labelOverlap=True),
+        )
+        people = (
             alt.Chart(cumulative)
             .mark_line(point=True)
             .add_params(shown)
             .transform_filter(shown)
             .encode(
-                x=alt.X(
-                    "yearmonthdate(date):T",
-                    title=None,
-                    axis=alt.Axis(format="%b %d", labelOverlap=True),
-                ),
+                x=x,
                 y=alt.Y("total:Q", title="Running total"),
                 # Fixed domain keeps hidden people in the legend so they can be clicked back.
                 color=alt.Color(
@@ -107,10 +119,61 @@ def _(alt, df, line_item, mo):
                 ),
                 tooltip=[alt.Tooltip("date:T"), "person:N", alt.Tooltip("total:Q", title="Total")],
             )
-            .properties(title=f"{title[line_item.value]} over time", width="container", height=300)
+        )
+
+        # Black reference line: one of each selected item per day since the start.
+        rate = 2 if line_item.value == "both" else 1
+        pace_label = {
+            "both": "1 apple + 1 coffee a day",
+            "apple": "1 apple a day",
+            "coffee": "1 coffee a day",
+        }[line_item.value]
+        start = df["date"].min()
+        days = pd.date_range(start, df["date"].max(), freq="D")
+        pace_df = pd.DataFrame({"date": days, "total": (days - start).days * rate})
+        pace_df["label"] = pace_label
+        pace = (
+            alt.Chart(pace_df)
+            .mark_line(color="black", strokeDash=[6, 4])
+            .encode(
+                x=x,
+                y="total:Q",
+                tooltip=[
+                    alt.Tooltip("date:T"),
+                    alt.Tooltip("label:N", title="Pace"),
+                    alt.Tooltip("total:Q", title="Total"),
+                ],
+            )
+        )
+        pace_text = (
+            alt.Chart(pace_df.tail(1))
+            .mark_text(align="right", dx=-4, dy=-8, color="black", fontSize=11)
+            .encode(x=x, y="total:Q", text="label:N")
+        )
+        return alt.layer(people, pace, pace_text).properties(
+            title=f"{title[line_item.value]} over time", width="container", height=300
         )
 
     mo.vstack([line_item, _running_total()]) if len(df) else None
+    return
+
+
+@app.cell
+def _(alt, df):
+    _colors = alt.Scale(domain=["apple", "coffee"], range=["#c0392b", "#6f4e37"])
+    _per_person = df.groupby(["person", "item"], as_index=False)["quantity"].sum()
+    leaderboard = (
+        alt.Chart(_per_person)
+        .mark_bar()
+        .encode(
+            x=alt.X("sum(quantity):Q", title="Count"),
+            y=alt.Y("person:N", sort="-x", title=None),
+            color=alt.Color("item:N", scale=_colors, title="Item"),
+            tooltip=["person:N", "item:N", "quantity:Q"],
+        )
+        .properties(title="Leaderboard", width="container", height=220)
+    )
+    leaderboard if len(df) else None
     return
 
 
@@ -139,25 +202,6 @@ def _(alt, mo, types_df):
         if _charts
         else mo.callout("No apple or coffee types logged yet.", kind="neutral")
     )
-    return
-
-
-@app.cell
-def _(alt, df):
-    _colors = alt.Scale(domain=["apple", "coffee"], range=["#c0392b", "#6f4e37"])
-    _per_person = df.groupby(["person", "item"], as_index=False)["quantity"].sum()
-    leaderboard = (
-        alt.Chart(_per_person)
-        .mark_bar()
-        .encode(
-            x=alt.X("sum(quantity):Q", title="Count"),
-            y=alt.Y("person:N", sort="-x", title=None),
-            color=alt.Color("item:N", scale=_colors, title="Item"),
-            tooltip=["person:N", "item:N", "quantity:Q"],
-        )
-        .properties(title="Leaderboard", width="container", height=220)
-    )
-    leaderboard if len(df) else None
     return
 
 
