@@ -105,30 +105,48 @@ def _(df, dt, mo):
 
 
 @app.cell
-def _(alt, df, mo):
-    def _running_total(item):
-        sub = df[df["item"] == item]
+def _(mo):
+    line_item = mo.ui.radio(
+        options={"Apples + coffee": "both", "Apples": "apple", "Coffee": "coffee"},
+        value="Apples + coffee",
+        inline=True,
+    )
+    return (line_item,)
+
+
+@app.cell
+def _(alt, df, line_item, mo):
+    def _running_total():
+        sub = df if line_item.value == "both" else df[df["item"] == line_item.value]
         # One row per date and person, with 0 on days a person logged nothing, so every
         # line spans the whole range before taking the running sum.
         daily = sub.pivot_table(
             index="date", columns="person", values="quantity", aggfunc="sum", fill_value=0
+        ).reindex(
+            index=sorted(df["date"].unique()),
+            columns=sorted(df["person"].unique()),
+            fill_value=0,
         )
-        daily = daily.reindex(columns=sorted(df["person"].unique()), fill_value=0)
+        daily.index.name = "date"
         cumulative = daily.cumsum().reset_index().melt(id_vars="date", value_name="total")
+        title = {"both": "Apples + coffee", "apple": "Apples", "coffee": "Coffee"}
         return (
             alt.Chart(cumulative)
             .mark_line(point=True)
             .encode(
-                x=alt.X("yearmonthdate(date):T", title=None),
+                x=alt.X(
+                    "yearmonthdate(date):T",
+                    title=None,
+                    axis=alt.Axis(format="%b %d", labelOverlap=True),
+                ),
                 y=alt.Y("total:Q", title="Running total"),
                 color=alt.Color("person:N", title="Person"),
                 tooltip=[alt.Tooltip("date:T"), "person:N", alt.Tooltip("total:Q", title="Total")],
             )
-            .properties(title=f"{item.title()}s over time", width="container", height=280)
+            .properties(title=f"{title[line_item.value]} over time", width="container", height=300)
         )
 
-    _charts = [_running_total(i) for i in ("apple", "coffee") if (df["item"] == i).any()]
-    mo.hstack(_charts, widths="equal", gap=2) if _charts else None
+    mo.vstack([line_item, _running_total()]) if len(df) else None
     return
 
 
