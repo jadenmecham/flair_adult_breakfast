@@ -6,13 +6,11 @@ app = marimo.App(width="medium", app_title="Flair Adult Breakfast")
 
 @app.cell
 def _():
-    import datetime as dt
-
     import altair as alt
     import marimo as mo
     import pandas as pd
 
-    return alt, dt, mo, pd
+    return alt, mo, pd
 
 
 @app.cell
@@ -28,9 +26,9 @@ def _(mo, pd):
         df["date"] = pd.to_datetime(df["date"])
         return df
 
-    raw = load_csv("consumption.csv")  # per person: date, person, item, quantity
-    types_raw = load_csv("types.csv")  # office-wide: date, type, item, quantity
-    return raw, types_raw
+    df = load_csv("consumption.csv")  # per person: date, person, item, quantity
+    types_df = load_csv("types.csv")  # office-wide: date, type, item, quantity
+    return df, types_df
 
 
 @app.cell
@@ -43,64 +41,13 @@ def _(mo):
 
 
 @app.cell
-def _(mo, raw):
-    _start = raw["date"].min().date()
-    _stop = raw["date"].max().date()
-    date_range = mo.ui.date_range(start=_start, stop=_stop, value=(_start, _stop), label="Dates")
-    items = mo.ui.multiselect(
-        options=sorted(raw["item"].unique()), value=sorted(raw["item"].unique()), label="Items"
-    )
-    people = mo.ui.multiselect(
-        options=sorted(raw["person"].unique()), value=sorted(raw["person"].unique()), label="People"
-    )
-    mo.hstack([date_range, items, people], justify="start", gap=2)
-    return date_range, items, people
-
-
-@app.cell
-def _(date_range, items, people, pd, raw, types_raw):
-    _start, _stop = (pd.Timestamp(d) for d in date_range.value)
-    df = raw[
-        raw["date"].between(_start, _stop)
-        & raw["item"].isin(items.value)
-        & raw["person"].isin(people.value)
+def _(df, mo):
+    _tiles = [
+        mo.stat(int(df.loc[df["item"] == item, "quantity"].sum()), label=label)
+        for item, label in (("apple", "🍎 Total apples"), ("coffee", "☕ Total coffees"))
     ]
-    # Type tallies aren't per person, so the people filter doesn't apply.
-    types_df = types_raw[
-        types_raw["date"].between(_start, _stop) & types_raw["item"].isin(items.value)
-    ]
-    return df, types_df
-
-
-@app.cell
-def _(df, dt, mo):
-    def _stats():
-        if df.empty:
-            return mo.callout("No data matches these filters.", kind="warn")
-        latest = df["date"].max()
-        this_week = df[df["date"] > latest - dt.timedelta(days=7)]
-        last_week = df[
-            (df["date"] <= latest - dt.timedelta(days=7))
-            & (df["date"] > latest - dt.timedelta(days=14))
-        ]
-        tiles = []
-        for item, emoji in (("apple", "🍎"), ("coffee", "☕")):
-            total = int(df.loc[df["item"] == item, "quantity"].sum())
-            now = int(this_week.loc[this_week["item"] == item, "quantity"].sum())
-            before = int(last_week.loc[last_week["item"] == item, "quantity"].sum())
-            tiles.append(mo.stat(total, label=f"{emoji} {item.title()}s", caption="in range"))
-            tiles.append(
-                mo.stat(
-                    now,
-                    label=f"{emoji} Last 7 days",
-                    caption=f"{now - before:+d} vs. prior 7 days",
-                    direction="increase" if now >= before else "decrease",
-                )
-            )
-        footnote = mo.md(f"_Weekly figures run through {latest:%b %d, %Y}._")
-        return mo.vstack([mo.hstack(tiles, widths="equal"), footnote])
-
-    _stats()
+    _caption = mo.md(f"_From everyone's tallies, as of {df['date'].max():%b %d, %Y}._")
+    mo.vstack([mo.hstack(_tiles, widths="equal"), _caption]) if len(df) else None
     return
 
 
@@ -130,9 +77,21 @@ def _(alt, df, line_item, mo):
         daily.index.name = "date"
         cumulative = daily.cumsum().reset_index().melt(id_vars="date", value_name="total")
         title = {"both": "Apples + coffee", "apple": "Apples", "coffee": "Coffee"}
+        # Everyone starts selected; clicking a legend entry toggles that person out (hidden,
+        # faded in the legend) and back in. clear=False stops a double-click hiding everyone.
+        shown = alt.selection_point(
+            fields=["person"],
+            bind="legend",
+            toggle="true",
+            empty=False,
+            clear=False,
+            value=[{"person": p} for p in daily.columns],
+        )
         return (
             alt.Chart(cumulative)
             .mark_line(point=True)
+            .add_params(shown)
+            .transform_filter(shown)
             .encode(
                 x=alt.X(
                     "yearmonthdate(date):T",
@@ -140,7 +99,12 @@ def _(alt, df, line_item, mo):
                     axis=alt.Axis(format="%b %d", labelOverlap=True),
                 ),
                 y=alt.Y("total:Q", title="Running total"),
-                color=alt.Color("person:N", title="Person"),
+                # Fixed domain keeps hidden people in the legend so they can be clicked back.
+                color=alt.Color(
+                    "person:N",
+                    scale=alt.Scale(domain=list(daily.columns)),
+                    title="Person (click to hide)",
+                ),
                 tooltip=[alt.Tooltip("date:T"), "person:N", alt.Tooltip("total:Q", title="Total")],
             )
             .properties(title=f"{title[line_item.value]} over time", width="container", height=300)
@@ -173,7 +137,7 @@ def _(alt, mo, types_df):
     (
         mo.hstack(_charts, widths="equal", gap=2)
         if _charts
-        else mo.callout("No apple or coffee types logged for this range yet.", kind="neutral")
+        else mo.callout("No apple or coffee types logged yet.", kind="neutral")
     )
     return
 
