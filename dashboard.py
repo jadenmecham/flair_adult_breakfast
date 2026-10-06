@@ -18,8 +18,8 @@ def _():
 @app.cell
 def _(mo, pd):
     # Kept separate from data.py: the WASM export can't import local modules.
-    def load_consumption():
-        src = str(mo.notebook_location() / "public" / "consumption.csv")
+    def load_csv(name):
+        src = str(mo.notebook_location() / "public" / name)
         if src.startswith(("http://", "https://")):
             from pyodide.http import open_url  # only exists in the browser
 
@@ -28,8 +28,9 @@ def _(mo, pd):
         df["date"] = pd.to_datetime(df["date"])
         return df
 
-    raw = load_consumption()
-    return (raw,)
+    raw = load_csv("consumption.csv")  # per person: date, person, item, quantity
+    types_raw = load_csv("types.csv")  # office-wide: date, type, item, quantity
+    return raw, types_raw
 
 
 @app.cell
@@ -57,14 +58,18 @@ def _(mo, raw):
 
 
 @app.cell
-def _(date_range, items, people, pd, raw):
+def _(date_range, items, people, pd, raw, types_raw):
     _start, _stop = (pd.Timestamp(d) for d in date_range.value)
     df = raw[
         raw["date"].between(_start, _stop)
         & raw["item"].isin(items.value)
         & raw["person"].isin(people.value)
     ]
-    return (df,)
+    # Type tallies aren't per person, so the people filter doesn't apply.
+    types_df = types_raw[
+        types_raw["date"].between(_start, _stop) & types_raw["item"].isin(items.value)
+    ]
+    return df, types_df
 
 
 @app.cell
@@ -100,28 +105,38 @@ def _(df, dt, mo):
 
 
 @app.cell
-def _(alt, df):
-    _colors = alt.Scale(domain=["apple", "coffee"], range=["#c0392b", "#6f4e37"])
-    _daily = df.groupby(["date", "item"], as_index=False)["quantity"].sum()
-    over_time = (
-        alt.Chart(_daily)
-        .mark_bar()
-        .encode(
-            x=alt.X("yearmonthdate(date):T", title=None),
-            y=alt.Y("quantity:Q", title="Count"),
-            color=alt.Color("item:N", scale=_colors, title="Item"),
-            tooltip=[alt.Tooltip("date:T"), "item:N", "quantity:Q"],
+def _(alt, df, mo):
+    def _running_total(item):
+        sub = df[df["item"] == item]
+        # One row per date and person, with 0 on days a person logged nothing, so every
+        # line spans the whole range before taking the running sum.
+        daily = sub.pivot_table(
+            index="date", columns="person", values="quantity", aggfunc="sum", fill_value=0
         )
-        .properties(title="Daily consumption", width="container", height=260)
-    )
-    over_time if len(df) else None
+        daily = daily.reindex(columns=sorted(df["person"].unique()), fill_value=0)
+        cumulative = daily.cumsum().reset_index().melt(id_vars="date", value_name="total")
+        return (
+            alt.Chart(cumulative)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("yearmonthdate(date):T", title=None),
+                y=alt.Y("total:Q", title="Running total"),
+                color=alt.Color("person:N", title="Person"),
+                tooltip=[alt.Tooltip("date:T"), "person:N", alt.Tooltip("total:Q", title="Total")],
+            )
+            .properties(title=f"{item.title()}s over time", width="container", height=280)
+        )
+
+    _charts = [_running_total(i) for i in ("apple", "coffee") if (df["item"] == i).any()]
+    mo.hstack(_charts, widths="equal", gap=2) if _charts else None
     return
 
 
 @app.cell
-def _(alt, df, mo):
+def _(alt, mo, types_df):
     def _by_type(item, color):
-        sub = df[df["item"] == item].groupby("type", as_index=False)["quantity"].sum()
+        sub = types_df[types_df["item"] == item]
+        sub = sub.groupby("type", as_index=False)["quantity"].sum()
         return (
             alt.Chart(sub)
             .mark_bar(color=color)
@@ -130,12 +145,18 @@ def _(alt, df, mo):
                 y=alt.Y("type:N", sort="-x", title=None),
                 tooltip=["type:N", "quantity:Q"],
             )
-            .properties(title=f"{item.title()}s by type", width="container", height=180)
+            .properties(
+                title=f"{item.title()}s by type (whole office)", width="container", height=180
+            )
         )
 
-    mo.hstack(
-        [_by_type("apple", "#c0392b"), _by_type("coffee", "#6f4e37")], widths="equal", gap=2
-    ) if len(df) else None
+    _colors = {"apple": "#c0392b", "coffee": "#6f4e37"}
+    _charts = [_by_type(i, c) for i, c in _colors.items() if (types_df["item"] == i).any()]
+    (
+        mo.hstack(_charts, widths="equal", gap=2)
+        if _charts
+        else mo.callout("No apple or coffee types logged for this range yet.", kind="neutral")
+    )
     return
 
 
@@ -159,9 +180,12 @@ def _(alt, df):
 
 
 @app.cell
-def _(df, mo):
-    _table = df.sort_values("date", ascending=False).assign(date=df["date"].dt.date)
-    mo.accordion({"Raw data": mo.ui.table(_table, page_size=15, selection=None)})
+def _(df, mo, types_df):
+    def _table(frame):
+        frame = frame.sort_values("date", ascending=False).assign(date=frame["date"].dt.date)
+        return mo.ui.table(frame, page_size=15, selection=None)
+
+    mo.accordion({"Raw data": mo.ui.tabs({"Per person": _table(df), "By type": _table(types_df)})})
     return
 
 

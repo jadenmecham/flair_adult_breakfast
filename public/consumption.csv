@@ -1,188 +1,31 @@
-date,person,item,type,quantity
-2026-09-07,Alex,apple,Gala,1
-2026-09-07,Alex,coffee,drip,1
-2026-09-07,Bri,apple,Gala,1
-2026-09-07,Bri,coffee,drip,1
-2026-09-07,Casey,apple,Honeycrisp,2
-2026-09-07,Casey,coffee,latte,2
-2026-09-07,Dana,apple,Honeycrisp,1
-2026-09-07,Dana,coffee,latte,1
-2026-09-07,Eli,coffee,latte,1
-2026-09-07,Frankie,apple,Gala,1
-2026-09-07,Frankie,coffee,latte,1
-2026-09-08,Alex,apple,Honeycrisp,1
-2026-09-08,Alex,coffee,cold brew,2
-2026-09-08,Bri,apple,Granny Smith,1
-2026-09-08,Casey,apple,Gala,2
-2026-09-08,Casey,coffee,latte,1
-2026-09-08,Dana,apple,Fuji,2
-2026-09-08,Dana,coffee,espresso,2
-2026-09-08,Eli,apple,Fuji,1
-2026-09-08,Eli,coffee,cold brew,1
-2026-09-08,Frankie,coffee,espresso,1
-2026-09-09,Alex,apple,Fuji,1
-2026-09-09,Alex,coffee,drip,3
-2026-09-09,Bri,apple,Honeycrisp,1
-2026-09-09,Bri,coffee,cold brew,1
-2026-09-09,Casey,apple,Granny Smith,1
-2026-09-09,Casey,coffee,latte,2
-2026-09-09,Dana,apple,Gala,2
-2026-09-09,Dana,coffee,latte,1
-2026-09-09,Eli,coffee,latte,1
-2026-09-09,Frankie,apple,Gala,2
-2026-09-10,Alex,apple,Fuji,3
-2026-09-10,Alex,coffee,cold brew,3
-2026-09-10,Bri,apple,Gala,1
-2026-09-10,Bri,coffee,drip,1
-2026-09-10,Casey,apple,Granny Smith,1
-2026-09-10,Casey,coffee,espresso,2
-2026-09-10,Dana,apple,Gala,2
-2026-09-10,Dana,coffee,drip,1
-2026-09-10,Frankie,coffee,cold brew,1
-2026-09-11,Alex,apple,Fuji,1
-2026-09-11,Alex,coffee,latte,1
-2026-09-11,Bri,apple,Honeycrisp,1
-2026-09-11,Bri,coffee,drip,3
-2026-09-11,Casey,coffee,latte,2
-2026-09-11,Dana,apple,Granny Smith,3
-2026-09-11,Dana,coffee,cold brew,1
-2026-09-11,Frankie,apple,Fuji,1
-2026-09-11,Frankie,coffee,espresso,2
-2026-09-14,Alex,apple,Gala,1
-2026-09-14,Alex,coffee,espresso,1
-2026-09-14,Bri,apple,Honeycrisp,2
-2026-09-14,Bri,coffee,drip,2
-2026-09-14,Casey,apple,Granny Smith,3
-2026-09-14,Casey,coffee,latte,1
-2026-09-14,Dana,coffee,latte,2
-2026-09-14,Eli,coffee,latte,2
-2026-09-14,Frankie,coffee,latte,1
-2026-09-15,Alex,apple,Honeycrisp,3
-2026-09-15,Alex,coffee,cold brew,1
-2026-09-15,Casey,apple,Granny Smith,3
-2026-09-15,Casey,coffee,latte,1
-2026-09-15,Dana,apple,Granny Smith,1
-2026-09-15,Dana,coffee,drip,1
-2026-09-15,Eli,coffee,drip,2
-2026-09-15,Frankie,apple,Fuji,2
-2026-09-15,Frankie,coffee,cold brew,2
-2026-09-16,Alex,apple,Granny Smith,1
-2026-09-16,Bri,coffee,drip,2
-2026-09-16,Casey,apple,Gala,1
-2026-09-16,Casey,coffee,cold brew,2
-2026-09-16,Dana,apple,Fuji,2
-2026-09-16,Dana,coffee,latte,1
-2026-09-16,Eli,coffee,drip,1
-2026-09-16,Frankie,coffee,latte,2
-2026-09-17,Alex,apple,Granny Smith,1
-2026-09-17,Alex,coffee,espresso,1
-2026-09-17,Bri,apple,Gala,1
-2026-09-17,Bri,coffee,cold brew,2
-2026-09-17,Casey,coffee,latte,1
-2026-09-17,Dana,apple,Honeycrisp,2
-2026-09-17,Dana,coffee,drip,2
-2026-09-17,Eli,apple,Gala,1
-2026-09-17,Eli,coffee,drip,1
-2026-09-17,Frankie,apple,Fuji,2
-2026-09-17,Frankie,coffee,drip,1
-2026-09-18,Alex,apple,Honeycrisp,1
-2026-09-18,Alex,coffee,drip,1
-2026-09-18,Bri,coffee,latte,2
-2026-09-18,Casey,apple,Fuji,1
-2026-09-18,Casey,coffee,espresso,3
-2026-09-18,Dana,coffee,cold brew,1
-2026-09-18,Eli,apple,Fuji,1
-2026-09-18,Eli,coffee,cold brew,1
-2026-09-18,Frankie,coffee,latte,3
-2026-09-21,Alex,coffee,espresso,2
-2026-09-21,Bri,coffee,drip,1
-2026-09-21,Casey,apple,Gala,1
-2026-09-21,Casey,coffee,cold brew,1
-2026-09-21,Dana,apple,Granny Smith,1
-2026-09-21,Dana,coffee,espresso,1
-2026-09-21,Eli,apple,Honeycrisp,1
-2026-09-21,Eli,coffee,espresso,1
-2026-09-21,Frankie,apple,Gala,3
-2026-09-21,Frankie,coffee,espresso,1
-2026-09-22,Alex,coffee,latte,2
-2026-09-22,Bri,coffee,espresso,1
-2026-09-22,Casey,apple,Fuji,2
-2026-09-22,Casey,coffee,drip,2
-2026-09-22,Dana,apple,Honeycrisp,1
-2026-09-22,Dana,coffee,drip,2
-2026-09-22,Eli,apple,Gala,1
-2026-09-22,Frankie,apple,Granny Smith,3
-2026-09-22,Frankie,coffee,espresso,2
-2026-09-23,Alex,apple,Gala,3
-2026-09-23,Bri,apple,Gala,1
-2026-09-23,Bri,coffee,espresso,1
-2026-09-23,Casey,apple,Fuji,1
-2026-09-23,Casey,coffee,espresso,2
-2026-09-23,Dana,coffee,drip,2
-2026-09-23,Eli,apple,Gala,1
-2026-09-23,Eli,coffee,cold brew,1
-2026-09-23,Frankie,coffee,cold brew,1
-2026-09-24,Bri,apple,Gala,3
-2026-09-24,Bri,coffee,latte,1
-2026-09-24,Casey,apple,Honeycrisp,2
-2026-09-24,Casey,coffee,espresso,1
-2026-09-24,Dana,apple,Fuji,2
-2026-09-24,Dana,coffee,espresso,1
-2026-09-24,Eli,coffee,latte,1
-2026-09-24,Frankie,apple,Granny Smith,1
-2026-09-24,Frankie,coffee,espresso,1
-2026-09-25,Alex,coffee,espresso,1
-2026-09-25,Bri,apple,Honeycrisp,1
-2026-09-25,Bri,coffee,latte,1
-2026-09-25,Casey,coffee,drip,1
-2026-09-25,Dana,apple,Fuji,1
-2026-09-25,Dana,coffee,latte,1
-2026-09-25,Frankie,apple,Fuji,2
-2026-09-25,Frankie,coffee,cold brew,1
-2026-09-28,Alex,coffee,drip,2
-2026-09-28,Bri,coffee,cold brew,2
-2026-09-28,Casey,coffee,drip,2
-2026-09-28,Dana,apple,Gala,1
-2026-09-28,Dana,coffee,espresso,3
-2026-09-28,Eli,apple,Fuji,1
-2026-09-28,Eli,coffee,latte,1
-2026-09-28,Frankie,apple,Honeycrisp,2
-2026-09-28,Frankie,coffee,drip,2
-2026-09-29,Alex,apple,Fuji,1
-2026-09-29,Alex,coffee,espresso,1
-2026-09-29,Bri,coffee,cold brew,1
-2026-09-29,Casey,apple,Fuji,3
-2026-09-29,Casey,coffee,drip,2
-2026-09-29,Dana,coffee,latte,1
-2026-09-29,Eli,coffee,latte,1
-2026-09-29,Frankie,apple,Granny Smith,3
-2026-09-29,Frankie,coffee,latte,2
-2026-09-30,Alex,apple,Granny Smith,1
-2026-09-30,Alex,coffee,drip,3
-2026-09-30,Bri,apple,Granny Smith,3
-2026-09-30,Casey,apple,Fuji,1
-2026-09-30,Casey,coffee,cold brew,3
-2026-09-30,Dana,apple,Gala,1
-2026-09-30,Dana,coffee,espresso,3
-2026-09-30,Eli,apple,Granny Smith,2
-2026-09-30,Eli,coffee,latte,1
-2026-09-30,Frankie,coffee,latte,1
-2026-10-01,Alex,apple,Fuji,1
-2026-10-01,Alex,coffee,cold brew,1
-2026-10-01,Bri,apple,Granny Smith,1
-2026-10-01,Bri,coffee,cold brew,1
-2026-10-01,Casey,coffee,espresso,1
-2026-10-01,Dana,apple,Fuji,3
-2026-10-01,Dana,coffee,espresso,3
-2026-10-01,Frankie,apple,Honeycrisp,2
-2026-10-01,Frankie,coffee,latte,1
-2026-10-02,Alex,apple,Granny Smith,1
-2026-10-02,Alex,coffee,cold brew,2
-2026-10-02,Bri,coffee,latte,2
-2026-10-02,Casey,apple,Fuji,1
-2026-10-02,Casey,coffee,espresso,1
-2026-10-02,Dana,coffee,latte,1
-2026-10-02,Eli,apple,Granny Smith,1
-2026-10-02,Eli,coffee,espresso,1
-2026-10-02,Frankie,apple,Fuji,1
-2026-10-02,Frankie,coffee,latte,2
+date,person,item,quantity
+2026-09-16,Iman,apple,0
+2026-09-16,Iman,coffee,0
+2026-09-16,Jaden,apple,0
+2026-09-16,Jaden,coffee,0
+2026-09-16,Kevin,apple,0
+2026-09-16,Kevin,coffee,0
+2026-09-16,Michael,apple,0
+2026-09-16,Michael,coffee,0
+2026-09-16,Nate,apple,0
+2026-09-16,Nate,coffee,0
+2026-09-16,Quang,apple,0
+2026-09-16,Quang,coffee,0
+2026-09-16,Thane,apple,0
+2026-09-16,Thane,coffee,0
+2026-09-16,Toha,apple,0
+2026-09-16,Toha,coffee,0
+2026-10-05,Iman,apple,3
+2026-10-05,Iman,coffee,15
+2026-10-05,Jaden,apple,21
+2026-10-05,Jaden,coffee,12
+2026-10-05,Kevin,coffee,16
+2026-10-05,Michael,apple,8
+2026-10-05,Michael,coffee,26
+2026-10-05,Nate,apple,2
+2026-10-05,Quang,apple,4
+2026-10-05,Quang,coffee,23
+2026-10-05,Thane,apple,11
+2026-10-05,Thane,coffee,17
+2026-10-05,Toha,apple,1
+2026-10-05,Toha,coffee,8
