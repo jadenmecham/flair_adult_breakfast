@@ -19,8 +19,9 @@ def _():
 def _(mo):
     mo.md("""
     # ✍️ Whiteboard data entry
-    Log what was consumed **since the last check-in**, not running totals; the dashboard
-    adds them up. Commit and push `public/` afterwards to update the public dashboard.
+    Copy the **running totals** from the whiteboard. Each box starts at the current total;
+    change the ones that went up and save. Each date you save becomes a new point on the
+    dashboard. Commit and push `public/` afterwards to update the public dashboard.
     """)
     return
 
@@ -38,101 +39,117 @@ def _(data, get_version):
     get_version()
     people_df = data.load("consumption")
     types_df = data.load("types")
-    return people_df, types_df
+    people_now = data.latest("consumption")
+    types_now = data.latest("types")
+    return people_df, people_now, types_df, types_now
 
 
 @app.cell
 def _(data, mo, set_message, set_version):
-    def submit(table, row, describe):
+    def save_totals(table, date, totals, before):
+        """Record totals that differ from `before`. Keys of both are (name, item)."""
+        label = data.TABLES[table]["label"]
+        rows = [
+            {"date": date, label: name, "item": item, "quantity": q}
+            for (name, item), q in totals.items()
+            if name and q is not None and q != before.get((name, item))
+        ]
+        if not rows:
+            set_message(mo.callout("Nothing changed, so nothing was saved.", kind="neutral"))
+            return
         try:
-            clean = data.append(table, row)
+            data.record(table, rows)
         except ValueError as e:
             set_message(mo.callout(f"Not saved: {e}", kind="danger"))
             return
-        set_message(mo.callout(f"Saved {describe(clean)}.", kind="success"))
+        lines = [f"- {r[label]} {r['item']}: {r['quantity']}" for r in rows]
+        dropped = [
+            f"{r[label]} {r['item']}"
+            for r in rows
+            if r["quantity"] < before.get((r[label], r["item"]), 0)
+        ]
+        kind = "warn" if dropped else "success"
+        note = f"\n\n⚠️ Lower than before: {', '.join(dropped)}." if dropped else ""
+        set_message(
+            mo.callout(mo.md(f"Saved for {date}:\n\n" + "\n".join(lines) + note), kind=kind)
+        )
         set_version(lambda v: v + 1)
 
-    return (submit,)
+    return (save_totals,)
 
 
 @app.cell
-def _(data, dt, mo, people_df, submit):
-    def _on_submit(value):
-        if value is None:
+def _(dt, mo, people_now, save_totals):
+    _before = {(r.person, r.item): int(r.quantity) for r in people_now.itertuples(index=False)}
+    _people = sorted({p for p, _ in _before})
+    _elements = {"date": mo.ui.date(value=dt.date.today(), label="Totals as of")}
+    _rows = []
+    for _i, _p in enumerate(_people):
+        _elements[f"a{_i}"] = mo.ui.number(start=0, value=_before.get((_p, "apple"), 0))
+        _elements[f"c{_i}"] = mo.ui.number(start=0, value=_before.get((_p, "coffee"), 0))
+        _rows.append(f"| {_p} | {{a{_i}}} | {{c{_i}}} |")
+    _elements["new_name"] = mo.ui.text(placeholder="New person")
+    _elements["new_a"] = mo.ui.number(start=0, value=0)
+    _elements["new_c"] = mo.ui.number(start=0, value=0)
+    _rows.append("| {new_name} | {new_a} | {new_c} |")
+
+    def _on_submit(v):
+        if v is None:
             return
-        row = {
-            "date": value["date"],
-            "person": value["new_person"].strip() or value["person"],
-            "item": value["item"],
-            "quantity": value["quantity"],
-        }
-        submit(
-            "consumption",
-            row,
-            lambda r: f"{r['quantity']} {r['item']}(s) for {r['person']} on {r['date']}",
+        totals = {}
+        for i, p in enumerate(_people):
+            totals[(p, "apple")] = v[f"a{i}"]
+            totals[(p, "coffee")] = v[f"c{i}"]
+        new = v["new_name"].strip()
+        if new:
+            totals[(new, "apple")] = v["new_a"]
+            totals[(new, "coffee")] = v["new_c"]
+        save_totals("consumption", v["date"], totals, _before)
+
+    people_form = (
+        mo.md(
+            "## People\n\n{date}\n\n| Person | 🍎 Apples | ☕ Coffees |\n|---|---|---|\n"
+            + "\n".join(_rows)
         )
-
-    person_form = (
-        mo.md("""
-        ## Per person
-        {date}
-
-        {person} or new: {new_person}
-
-        {item} {quantity}
-        """)
-        .batch(
-            date=mo.ui.date(value=dt.date.today(), label="Date"),
-            person=mo.ui.dropdown(options=sorted(people_df["person"].unique()), label="Person"),
-            new_person=mo.ui.text(placeholder="New person"),
-            item=mo.ui.dropdown(options=data.ITEMS, value=data.ITEMS[0], label="Item"),
-            quantity=mo.ui.number(start=0, stop=200, value=1, label="Quantity"),
-        )
-        .form(submit_button_label="Add", clear_on_submit=False, on_change=_on_submit)
+        .batch(**_elements)
+        .form(submit_button_label="Save people totals", on_change=_on_submit)
     )
-    person_form
+    people_form
     return
 
 
 @app.cell
-def _(data, mo):
-    # Outside the form so the type dropdown can follow it.
-    type_item = mo.ui.radio(options=data.ITEMS, value=data.ITEMS[0], label="Item", inline=True)
-    mo.vstack([mo.md("## Office-wide by type"), type_item])
-    return (type_item,)
+def _(data, dt, mo, save_totals, types_now):
+    _before = {(r.type, r.item): int(r.quantity) for r in types_now.itertuples(index=False)}
+    _keys = sorted(_before, key=lambda k: (k[1], k[0]))  # apples first, then coffee
+    _elements = {"date": mo.ui.date(value=dt.date.today(), label="Totals as of")}
+    _rows = []
+    for _i, (_t, _item) in enumerate(_keys):
+        _elements[f"t{_i}"] = mo.ui.number(start=0, value=_before[(_t, _item)])
+        _rows.append(f"| {_item} | {_t} | {{t{_i}}} |")
+    _elements["new_item"] = mo.ui.dropdown(options=data.ITEMS, value=data.ITEMS[0])
+    _elements["new_name"] = mo.ui.text(placeholder="New type")
+    _elements["new_q"] = mo.ui.number(start=0, value=0)
+    _rows.append("| {new_item} | {new_name} | {new_q} |")
 
-
-@app.cell
-def _(dt, mo, submit, type_item, types_df):
-    def _on_submit(value):
-        if value is None:
+    def _on_submit(v):
+        if v is None:
             return
-        row = {
-            "date": value["date"],
-            "type": value["new_type"].strip() or value["type"],
-            "item": type_item.value,
-            "quantity": value["quantity"],
-        }
-        submit("types", row, lambda r: f"{r['quantity']} × {r['type']} {r['item']} on {r['date']}")
+        totals = {k: v[f"t{i}"] for i, k in enumerate(_keys)}
+        new = v["new_name"].strip()
+        if new:
+            totals[(new, v["new_item"])] = v["new_q"]
+        save_totals("types", v["date"], totals, _before)
 
-    _types = sorted(types_df.loc[types_df["item"] == type_item.value, "type"].unique())
-    type_form = (
-        mo.md("""
-        {date}
-
-        {type} or new: {new_type}
-
-        {quantity}
-        """)
-        .batch(
-            date=mo.ui.date(value=dt.date.today(), label="Date"),
-            type=mo.ui.dropdown(options=_types, label="Type"),
-            new_type=mo.ui.text(placeholder=f"New {type_item.value} type"),
-            quantity=mo.ui.number(start=1, stop=500, value=1, label="Quantity"),
+    types_form = (
+        mo.md(
+            "## Types (whole office)\n\n{date}\n\n| Item | Type | Total |\n|---|---|---|\n"
+            + "\n".join(_rows)
         )
-        .form(submit_button_label="Add", clear_on_submit=False, on_change=_on_submit)
+        .batch(**_elements)
+        .form(submit_button_label="Save type totals", on_change=_on_submit)
     )
-    type_form
+    types_form
     return
 
 
@@ -144,29 +161,13 @@ def _(get_message):
 
 @app.cell
 def _(mo, people_df, types_df):
-    mo.vstack(
-        [
-            mo.md("## Recent entries"),
-            mo.ui.tabs(
-                {
-                    "Per person": mo.ui.table(people_df.tail(10).iloc[::-1], selection=None),
-                    "By type": mo.ui.table(types_df.tail(10).iloc[::-1], selection=None),
-                }
-            ),
-        ]
-    )
-    return
-
-
-@app.cell
-def _(mo, people_df, types_df):
     people_editor = mo.ui.data_editor(people_df.assign(date=people_df["date"].astype(str)))
     types_editor = mo.ui.data_editor(types_df.assign(date=types_df["date"].astype(str)))
     save = mo.ui.run_button(label="Save edits", kind="warn")
     mo.accordion(
         {
-            "Fix mistakes": mo.vstack(
-                [mo.ui.tabs({"Per person": people_editor, "By type": types_editor}), save]
+            "Fix mistakes (all rows)": mo.vstack(
+                [mo.ui.tabs({"People": people_editor, "Types": types_editor}), save]
             )
         }
     )

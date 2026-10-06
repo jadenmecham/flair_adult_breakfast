@@ -29,9 +29,36 @@ def _(mo, pd):
         df["date"] = pd.to_datetime(df["date"])
         return df
 
+    # Each row is a running total as of the end of that date, not a daily amount.
     df = load_csv("consumption.csv")  # per person: date, person, item, quantity
     types_df = load_csv("types.csv")  # office-wide: date, type, item, quantity
     return df, types_df
+
+
+@app.cell
+def _(pd):
+    def running(frame, label, items):
+        """Date × `label` table of running totals summed over `items`.
+
+        Each total is carried forward until that person/type's next entry,
+        and is 0 before their first one.
+        """
+        dates = pd.Index(sorted(frame["date"].unique()), name="date")
+        labels = sorted(frame[label].unique())
+        total = pd.DataFrame(0, index=dates, columns=labels)
+        for item in items:
+            sub = frame[frame["item"] == item]
+            if sub.empty:
+                continue
+            wide = sub.groupby(["date", label])["quantity"].last().unstack()
+            total = total + wide.reindex(index=dates, columns=labels).ffill().fillna(0)
+        return total.astype(int)
+
+    def current(frame, label, item):
+        """Latest running total per person/type for one item."""
+        return running(frame, label, [item]).iloc[-1]
+
+    return current, running
 
 
 @app.cell
@@ -44,13 +71,13 @@ def _(mo):
 
 
 @app.cell
-def _(df, mo):
+def _(current, df, mo):
     def _summary():
         start, end = df["date"].min(), df["date"].max()
         days = (end - start).days + 1  # calendar days, counting both ends
         tiles = []
         for item, emoji, plural in (("apple", "🍎", "apples"), ("coffee", "☕", "coffees")):
-            total = int(df.loc[df["item"] == item, "quantity"].sum())
+            total = int(current(df, "person", item).sum())
             tiles.append(mo.stat(total, label=f"{emoji} Total {plural}"))
             tiles.append(mo.stat(f"{total / days:.1f}", label=f"{emoji} {plural.title()} per day"))
         caption = mo.md(
@@ -73,20 +100,11 @@ def _(mo):
 
 
 @app.cell
-def _(alt, df, line_item, mo, pd):
+def _(alt, df, line_item, mo, pd, running):
     def _running_total():
-        sub = df if line_item.value == "both" else df[df["item"] == line_item.value]
-        # One row per date and person, with 0 on days a person logged nothing, so every
-        # line spans the whole range before taking the running sum.
-        daily = sub.pivot_table(
-            index="date", columns="person", values="quantity", aggfunc="sum", fill_value=0
-        ).reindex(
-            index=sorted(df["date"].unique()),
-            columns=sorted(df["person"].unique()),
-            fill_value=0,
-        )
-        daily.index.name = "date"
-        cumulative = daily.cumsum().reset_index().melt(id_vars="date", value_name="total")
+        items = ["apple", "coffee"] if line_item.value == "both" else [line_item.value]
+        daily = running(df, "person", items)
+        cumulative = daily.reset_index().melt(id_vars="date", var_name="person", value_name="total")
         title = {"both": "Apples + coffee", "apple": "Apples", "coffee": "Coffee"}
         # Everyone starts selected; clicking a legend entry toggles that person out (hidden,
         # faded in the legend) and back in. clear=False stops a double-click hiding everyone.
@@ -159,9 +177,16 @@ def _(alt, df, line_item, mo, pd):
 
 
 @app.cell
-def _(alt, df):
+def _(alt, current, df, pd):
     _colors = alt.Scale(domain=["apple", "coffee"], range=["#c0392b", "#6f4e37"])
-    _per_person = df.groupby(["person", "item"], as_index=False)["quantity"].sum()
+    _per_person = pd.concat(
+        current(df, "person", i)
+        .rename("quantity")
+        .rename_axis("person")
+        .reset_index()
+        .assign(item=i)
+        for i in ("apple", "coffee")
+    )
     leaderboard = (
         alt.Chart(_per_person)
         .mark_bar()
@@ -178,10 +203,10 @@ def _(alt, df):
 
 
 @app.cell
-def _(alt, mo, types_df):
+def _(alt, current, mo, types_df):
     def _by_type(item, color):
-        sub = types_df[types_df["item"] == item]
-        sub = sub.groupby("type", as_index=False)["quantity"].sum()
+        sub = current(types_df[types_df["item"] == item], "type", item)
+        sub = sub.rename("quantity").rename_axis("type").reset_index()
         return (
             alt.Chart(sub)
             .mark_bar(color=color)

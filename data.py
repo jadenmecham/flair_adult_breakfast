@@ -1,13 +1,15 @@
 """Schemas, loading, and validated writes for the two CSV tables.
 
-- "consumption": per-person tallies (date, person, item, quantity).
-- "types": office-wide tallies by type, not tied to a person (date, item, type, quantity).
+- "consumption": per-person totals (date, person, item, quantity).
+- "types": office-wide totals by type, not tied to a person (date, type, item, quantity).
+
+Every row is a running total as of the end of `date`, not a daily amount. There is at
+most one row per (date, person/type, item); recording it again replaces the old value.
 
 Used by entry.py and the tests. dashboard.py keeps its own loader because
 marimo's WASM export does not bundle local modules.
 """
 
-import csv
 import datetime as dt
 from pathlib import Path
 
@@ -23,6 +25,10 @@ TABLES = {
 
 def columns(table: str) -> list[str]:
     return ["date", TABLES[table]["label"], "item", "quantity"]
+
+
+def key(table: str) -> list[str]:
+    return ["date", TABLES[table]["label"], "item"]
 
 
 def _path(table: str, path: Path | None) -> Path:
@@ -71,23 +77,30 @@ def validate(table: str, row: dict) -> dict:
     return {"date": date, label: name, "item": item, "quantity": quantity}
 
 
-def append(table: str, row: dict, path: Path | None = None) -> dict:
-    """Validate `row` and append it to the table's CSV, creating the file if needed."""
-    clean = validate(table, row)
-    path = _path(table, path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    new_file = not path.exists() or path.stat().st_size == 0
-    with path.open("a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=columns(table))
-        if new_file:
-            writer.writeheader()
-        writer.writerow({**clean, "date": clean["date"].isoformat()})
+def record(table: str, rows: list[dict], path: Path | None = None) -> list[dict]:
+    """Validate `rows` and write them, replacing any existing row with the same key."""
+    clean = [validate(table, r) for r in rows]
+    combined = pd.concat([load(table, path), pd.DataFrame(clean, columns=columns(table))])
+    save(table, combined, path)
     return clean
 
 
+def latest(table: str, path: Path | None = None) -> pd.DataFrame:
+    """Most recent total for each person/type and item, with the date it was recorded."""
+    df = load(table, path)
+    label = TABLES[table]["label"]
+    return df.sort_values("date", kind="stable").groupby([label, "item"], as_index=False).last()
+
+
 def save(table: str, df: pd.DataFrame, path: Path | None = None) -> None:
-    """Overwrite the table's CSV with `df` after validating every row (used for edits)."""
+    """Overwrite the table's CSV with `df` after validating every row.
+
+    If a key appears more than once, the last row wins.
+    """
     cols = columns(table)
     rows = [validate(table, r) for r in df[cols].to_dict("records")]
-    out = pd.DataFrame(rows, columns=cols).sort_values(["date", cols[1]], kind="stable")
-    out.to_csv(_path(table, path), index=False)
+    out = pd.DataFrame(rows, columns=cols).drop_duplicates(key(table), keep="last")
+    out = out.sort_values(["date", cols[1], "item"], kind="stable")
+    path = _path(table, path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(path, index=False)

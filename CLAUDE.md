@@ -19,9 +19,9 @@ Flair Adult Breakfast is a dashboard for apple and coffee consumption in the Fla
 
 The site is static (marimo WASM on GitHub Pages), so it can't save anything. Entering data and viewing it are therefore separate:
 
-1. `entry.py` is a marimo app run locally. Its forms append rows through `data.py`, and its data editors rewrite whole files through `data.save`. A `mo.state` version counter makes the cells reload the CSV after every write.
+1. `entry.py` is a marimo app run locally. Its whiteboard-style grids start from `data.latest` and record only the totals that changed, using `data.record`. Its data editors rewrite whole files through `data.save`. A `mo.state` version counter makes the cells reload the CSV after every write.
 2. `public/` is committed and pushed. `.github/workflows/deploy.yml` lints, tests, exports `dashboard.py` to WASM and deploys `dist/` to Pages.
-3. `dashboard.py` runs in the browser under Pyodide. It loads the CSVs from `mo.notebook_location() / "public" / ...`. The export copies `public/` next to the page, and in the browser the URL is fetched with `pyodide.http.open_url`.
+3. `dashboard.py` runs in the browser under Pyodide. It loads the CSVs from `mo.notebook_location() / "public" / ...` with a cache-busting query string. Its `running()` helper carries each person's or type's last total forward across later dates. The export copies `public/` next to the page, and in the browser the URL is fetched with `pyodide.http.open_url`.
 
 Constraints:
 - `dashboard.py` must not import local modules such as `data.py`, because the WASM export doesn't bundle them. It keeps its own small loader, so changes to the CSV schema have to be made in both places. Its dependencies must be packages Pyodide can load (pandas and altair are fine).
@@ -29,6 +29,7 @@ Constraints:
   - `public/consumption.csv` (`date, person, item, quantity`): per-person counts. The people list comes from this file.
   - `public/types.csv` (`date, type, item, quantity`): office-wide counts by type, not tied to a person. Its totals don't need to match the per-person totals.
   - `item` must be in `ITEMS` (`apple`, `coffee`) and `quantity ≥ 0`. A 0 row adds a person before they've had anything.
-  - Rows are amounts since the last check-in, not running totals. The dashboard computes the running sums.
-  - `validate(table, row)` is used for both appends and edits.
+  - Each row is a running total as of the end of `date`, not a daily amount. Never sum rows. Use the latest row per person or type.
+  - There is at most one row per `key(table)` (date, person or type, item). `record` and `save` replace duplicates, and the last row wins.
+  - `validate(table, row)` is used for both new entries and edits.
 - In marimo notebooks, each global name can be defined in only one cell. Names that start with `_` stay local to their cell. The project's ruff config ignores B018 in the notebooks because a cell displays its last expression.

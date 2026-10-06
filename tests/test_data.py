@@ -10,15 +10,38 @@ TYPE = {"date": "2026-10-05", "type": "Honeycrisp", "item": "apple", "quantity":
 
 
 @pytest.mark.parametrize(("table", "row"), [("consumption", PERSON), ("types", TYPE)])
-def test_append_creates_file_and_round_trips(tmp_path, table, row):
+def test_record_creates_file_and_round_trips(tmp_path, table, row):
     path = tmp_path / "t.csv"
-    data.append(table, row, path)
-    data.append(table, {**row, "item": "coffee", "quantity": 1}, path)
+    data.record(table, [row, {**row, "item": "coffee", "quantity": 1}], path)
     df = data.load(table, path)
     assert list(df.columns) == data.columns(table)
     assert df["item"].tolist() == ["apple", "coffee"]
     assert df.loc[0, "date"] == dt.date(2026, 10, 5)
-    assert df["quantity"].sum() == row["quantity"] + 1
+
+
+def test_record_same_key_replaces(tmp_path):
+    path = tmp_path / "t.csv"
+    data.record("consumption", [PERSON], path)
+    data.record("consumption", [{**PERSON, "quantity": 9}], path)
+    df = data.load("consumption", path)
+    assert df["quantity"].tolist() == [9]
+
+
+def test_latest_picks_most_recent_total(tmp_path):
+    path = tmp_path / "t.csv"
+    data.record(
+        "consumption",
+        [
+            {**PERSON, "date": "2026-10-07", "quantity": 5},
+            {**PERSON, "date": "2026-10-05", "quantity": 2},
+            {**PERSON, "person": "Iman", "quantity": 1},
+        ],
+        path,
+    )
+    latest = data.latest("consumption", path).set_index("person")
+    assert latest.loc["Jaden", "quantity"] == 5
+    assert latest.loc["Jaden", "date"] == dt.date(2026, 10, 7)
+    assert latest.loc["Iman", "quantity"] == 1
 
 
 def test_load_missing_file_is_empty(tmp_path):
