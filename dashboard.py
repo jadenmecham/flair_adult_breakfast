@@ -14,6 +14,25 @@ def _():
 
 
 @app.cell
+def _():
+    import datetime as dt
+
+    CHALLENGE_END = dt.date(2026, 12, 9)
+    COLORS = {"apple": "#c0392b", "coffee": "#6f4e37"}  # apple red, coffee brown
+
+    def today():
+        """The viewer's local date (Pyodide's own clock may be in UTC)."""
+        try:
+            from js import Date  # only exists in the browser
+        except ImportError:
+            return dt.date.today()
+        now = Date.new()
+        return dt.date(now.getFullYear(), now.getMonth() + 1, now.getDate())
+
+    return CHALLENGE_END, COLORS, today
+
+
+@app.cell
 def _(mo, pd):
     # Kept separate from data.py: the WASM export can't import local modules.
     def load_csv(name):
@@ -71,7 +90,7 @@ def _(mo):
 
 
 @app.cell
-def _(current, df, mo):
+def _(CHALLENGE_END, current, df, mo, today):
     def _summary():
         start, end = df["date"].min(), df["date"].max()
         days = (end - start).days + 1  # calendar days, counting both ends
@@ -80,10 +99,28 @@ def _(current, df, mo):
             total = int(current(df, "person", item).sum())
             tiles.append(mo.stat(total, label=f"{emoji} Total {plural}"))
             tiles.append(mo.stat(f"{total / days:.1f}", label=f"{emoji} {plural.title()} per day"))
-        caption = mo.md(
-            f"_From everyone's tallies, {start:%b %d} – {end:%b %d, %Y} ({days} days)._"
+        now = today()
+        left = (CHALLENGE_END - now).days
+        tiles.append(
+            mo.stat(
+                (now - start.date()).days,
+                label="📅 Days in",
+                caption=f"since {start:%b} {start.day}",
+            )
         )
-        return mo.vstack([mo.hstack(tiles, widths="equal"), caption])
+        tiles.append(
+            mo.stat(
+                max(left, 0),
+                label="⏳ Days left",
+                caption=f"until {CHALLENGE_END:%b} {CHALLENGE_END.day}"
+                if left > 0
+                else "challenge over",
+            )
+        )
+        caption = mo.md(
+            f"_Totals from everyone's tallies, {start:%b %d} – {end:%b %d, %Y} ({days} days)._"
+        )
+        return mo.vstack([mo.hstack(tiles, widths="equal", wrap=True), caption])
 
     _summary() if len(df) else None
     return
@@ -177,8 +214,8 @@ def _(alt, df, line_item, mo, pd, running):
 
 
 @app.cell
-def _(alt, current, df, pd):
-    _colors = alt.Scale(domain=["apple", "coffee"], range=["#c0392b", "#6f4e37"])
+def _(COLORS, alt, current, df, pd):
+    _colors = alt.Scale(domain=list(COLORS), range=list(COLORS.values()))
     _per_person = pd.concat(
         current(df, "person", i)
         .rename("quantity")
@@ -203,7 +240,7 @@ def _(alt, current, df, pd):
 
 
 @app.cell
-def _(alt, current, mo, types_df):
+def _(COLORS, alt, current, mo, types_df):
     def _by_type(item, color):
         sub = current(types_df[types_df["item"] == item], "type", item)
         sub = sub.rename("quantity").rename_axis("type").reset_index()
@@ -220,8 +257,7 @@ def _(alt, current, mo, types_df):
             )
         )
 
-    _colors = {"apple": "#c0392b", "coffee": "#6f4e37"}
-    _charts = [_by_type(i, c) for i, c in _colors.items() if (types_df["item"] == i).any()]
+    _charts = [_by_type(i, c) for i, c in COLORS.items() if (types_df["item"] == i).any()]
     (
         mo.hstack(_charts, widths="equal", gap=2)
         if _charts
