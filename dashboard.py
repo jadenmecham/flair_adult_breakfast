@@ -191,7 +191,7 @@ def _(alt, df, line_item, mo, pd, running):
         items_per_n = 2 if line_item.value == "both" else 1
         start = df["date"].min()
         days = pd.date_range(start, df["date"].max(), freq="D")
-        paces = [1, 4]
+        paces = [1]
         pace_df = pd.concat(
             pd.DataFrame(
                 {
